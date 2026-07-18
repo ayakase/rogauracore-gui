@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
 use gtk4::prelude::*;
-use gtk4::{Application, ApplicationWindow, Box, Label, Notebook, Orientation, ScrolledWindow};
+use gtk4::{
+    Application, ApplicationWindow, Box, DropDown, Label, Orientation, ScrolledWindow, Stack,
+    StringList,
+};
 
 use crate::rogauracore::client::ExecutionResult;
 use crate::ui::pages;
@@ -36,10 +39,6 @@ fn build_ui(app: &Application) {
     intro.set_xalign(0.0);
     root.append(&intro);
 
-    let notebook = Notebook::new();
-    notebook.set_hexpand(true);
-    notebook.set_vexpand(true);
-
     let status = Label::new(Some("Pick a mode, choose values, and apply a command."));
     status.set_wrap(true);
     status.set_xalign(0.0);
@@ -52,15 +51,40 @@ fn build_ui(app: &Application) {
         })
     };
 
-    for (title, page) in pages::build_pages(update_status) {
-        let tab = Label::new(Some(&title));
-        notebook.append_page(&page, Some(&tab));
+    let pages = pages::build_pages(update_status.clone());
+    let page_titles: Vec<&str> = pages.iter().map(|page| page.title.as_str()).collect();
+
+    let command_picker = DropDown::new(
+        Some(StringList::new(&page_titles)),
+        None::<gtk4::Expression>,
+    );
+    command_picker.set_selected(0);
+    root.append(&labeled_header("Command", &command_picker));
+
+    let stack = Stack::new();
+    stack.set_hexpand(true);
+    stack.set_vexpand(true);
+    stack.set_transition_type(gtk4::StackTransitionType::Crossfade);
+
+    for page in pages {
+        stack.add_titled(&page.content, Some(&page.id), &page.title);
     }
+
+    let stack_for_picker = stack.clone();
+    command_picker.connect_selected_notify(move |picker| {
+        if let Some(item) = picker.selected_item()
+            && let Ok(string_object) = item.downcast::<gtk4::StringObject>()
+        {
+            stack_for_picker.set_visible_child_name(string_object.string().as_str());
+        }
+    });
+
+    stack.set_visible_child_name("Single Static");
 
     let scroll = ScrolledWindow::builder()
         .hscrollbar_policy(gtk4::PolicyType::Never)
         .min_content_height(500)
-        .child(&notebook)
+        .child(&stack)
         .build();
 
     root.append(&scroll);
@@ -68,4 +92,17 @@ fn build_ui(app: &Application) {
 
     window.set_child(Some(&root));
     window.present();
+}
+
+fn labeled_header(label: &str, widget: &impl IsA<gtk4::Widget>) -> Box {
+    let row = Box::new(Orientation::Horizontal, 12);
+
+    let text = Label::new(Some(label));
+    text.set_xalign(0.0);
+    text.set_width_chars(10);
+    text.add_css_class("heading");
+
+    row.append(&text);
+    row.append(widget);
+    row
 }

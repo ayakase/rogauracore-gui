@@ -7,32 +7,34 @@ use crate::rogauracore::client::{ExecutionResult, run};
 use crate::rogauracore::command::AuraCommand;
 use crate::ui::widgets;
 
-pub fn build_pages(on_result: Rc<dyn Fn(ExecutionResult)>) -> Vec<(String, Box)> {
+pub struct CommandPage {
+    pub id: String,
+    pub title: String,
+    pub content: Box,
+}
+
+pub fn build_pages(on_result: Rc<dyn Fn(ExecutionResult)>) -> Vec<CommandPage> {
     vec![
-        (
-            "Single Static".into(),
-            single_static_page(on_result.clone()),
-        ),
-        (
-            "Single Breathing".into(),
-            single_breathing_page(on_result.clone()),
-        ),
-        (
-            "Single Pulsing".into(),
-            single_pulsing_page(on_result.clone()),
-        ),
-        (
-            "Single Colorcycle".into(),
+        page("Single Static", single_static_page(on_result.clone())),
+        page("Single Breathing", single_breathing_page(on_result.clone())),
+        page("Single Pulsing", single_pulsing_page(on_result.clone())),
+        page(
+            "Single Colorcycle",
             single_colorcycle_page(on_result.clone()),
         ),
-        ("Multi Static".into(), multi_static_page(on_result.clone())),
-        (
-            "Multi Breathing".into(),
-            multi_breathing_page(on_result.clone()),
-        ),
-        ("Rainbow".into(), rainbow_page(on_result.clone())),
-        ("Brightness".into(), brightness_page(on_result)),
+        page("Multi Static", multi_static_page(on_result.clone())),
+        page("Multi Breathing", multi_breathing_page(on_result.clone())),
+        page("Rainbow", rainbow_page(on_result.clone())),
+        page("Brightness", brightness_page(on_result)),
     ]
+}
+
+fn page(title: &str, content: Box) -> CommandPage {
+    CommandPage {
+        id: title.into(),
+        title: title.into(),
+        content,
+    }
 }
 
 fn single_static_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
