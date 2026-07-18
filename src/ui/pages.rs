@@ -1,15 +1,16 @@
 use std::rc::Rc;
 
 use gtk4::prelude::*;
-use gtk4::{Box, CheckButton, ColorButton, Label};
+use gtk4::{Box, CheckButton, ColorButton, Label, Orientation, PositionType, Scale};
 
 use crate::rogauracore::client::{ExecutionResult, run};
-use crate::rogauracore::command::AuraCommand;
+use crate::rogauracore::command::{AuraCommand, Brightness};
 use crate::ui::widgets;
 
 pub struct CommandPage {
     pub id: String,
     pub title: String,
+    pub nav_label: String,
     pub content: Box,
 }
 
@@ -25,23 +26,91 @@ pub fn build_pages(on_result: Rc<dyn Fn(ExecutionResult)>) -> Vec<CommandPage> {
         page("Multi Static", multi_static_page(on_result.clone())),
         page("Multi Breathing", multi_breathing_page(on_result.clone())),
         page("Rainbow", rainbow_page(on_result.clone())),
-        page("Brightness", brightness_page(on_result)),
     ]
+}
+
+pub fn build_brightness_section(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
+    let section = widgets::page_shell("Brightness", "Common setting.");
+
+    let slider_row = Box::new(Orientation::Horizontal, 12);
+    slider_row.add_css_class("form-row");
+
+    let label = Label::new(Some("Level"));
+    label.set_xalign(0.0);
+    label.set_width_chars(14);
+
+    let brightness = Scale::with_range(Orientation::Horizontal, 0.0, 3.0, 1.0);
+    brightness.set_draw_value(false);
+    brightness.set_hexpand(true);
+    brightness.set_value(2.0);
+    brightness.set_round_digits(0);
+    brightness.set_restrict_to_fill_level(false);
+    brightness.set_increments(1.0, 1.0);
+    brightness.set_digits(0);
+    brightness.add_mark(0.0, PositionType::Bottom, Some("Off"));
+    brightness.add_mark(1.0, PositionType::Bottom, Some("Low"));
+    brightness.add_mark(2.0, PositionType::Bottom, Some("Med"));
+    brightness.add_mark(3.0, PositionType::Bottom, Some("High"));
+
+    slider_row.append(&label);
+    slider_row.append(&brightness);
+    section.append(&slider_row);
+
+    brightness.connect_change_value(move |slider, _, value| {
+        let snapped = value.round().clamp(0.0, 3.0);
+        if (slider.value() - snapped).abs() > f64::EPSILON {
+            slider.set_value(snapped);
+        }
+
+        let command = AuraCommand::Brightness {
+            brightness: brightness_from_scale(snapped),
+        };
+        on_result(run(command));
+
+        glib::Propagation::Stop
+    });
+
+    section
+}
+
+fn brightness_from_scale(value: f64) -> Brightness {
+    match value.round() as i32 {
+        0 => Brightness::Off,
+        1 => Brightness::Low,
+        2 => Brightness::Medium,
+        _ => Brightness::High,
+    }
 }
 
 fn page(title: &str, content: Box) -> CommandPage {
     CommandPage {
-        id: title.into(),
+        id: slug(title),
         title: title.into(),
+        nav_label: nav_label(title),
         content,
     }
 }
 
+fn slug(title: &str) -> String {
+    title.to_lowercase().replace(' ', "-")
+}
+
+fn nav_label(title: &str) -> String {
+    match title {
+        "Single Static" => "Static".into(),
+        "Single Breathing" => "Breathing".into(),
+        "Single Pulsing" => "Pulsing".into(),
+        "Single Colorcycle" => "Cycle".into(),
+        "Multi Static" => "4-Zone Static".into(),
+        "Multi Breathing" => "4-Zone Breath".into(),
+        "Rainbow" => "Rainbow".into(),
+        "Brightness" => "Brightness".into(),
+        _ => title.into(),
+    }
+}
+
 fn single_static_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Single Static",
-        "Set the whole keyboard to one solid color.",
-    );
+    let page = widgets::page_shell("Single Static", "One solid color.");
 
     let color = widgets::color_button(1.0, 0.0, 0.0);
     page.append(&widgets::labeled_row("Color", &color));
@@ -59,15 +128,12 @@ fn single_static_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
 }
 
 fn single_breathing_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Single Breathing",
-        "Fade a single color in and out, or alternate between two colors. The speed argument remains optional just like the CLI.",
-    );
+    let page = widgets::page_shell("Single Breathing", "One or two colors.");
 
     let color1 = widgets::color_button(0.0, 1.0, 1.0);
     let color2 = widgets::color_button(1.0, 0.0, 1.0);
-    let use_color2 = widgets::optional_check("Use second color");
-    let use_speed = widgets::optional_check("Set speed");
+    let use_color2 = widgets::optional_check("Color 2");
+    let use_speed = widgets::optional_check("Speed");
     let speed = widgets::speed_dropdown();
     speed.set_sensitive(false);
     color2.set_sensitive(false);
@@ -100,7 +166,7 @@ fn single_breathing_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
 }
 
 fn single_pulsing_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell("Single Pulsing", "Pulse one color at a required speed.");
+    let page = widgets::page_shell("Single Pulsing", "Pulse one color.");
 
     let color = widgets::color_button(0.0, 0.75, 0.0);
     let speed = widgets::speed_dropdown();
@@ -122,10 +188,7 @@ fn single_pulsing_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
 }
 
 fn single_colorcycle_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Single Colorcycle",
-        "Cycle through colors across the whole keyboard.",
-    );
+    let page = widgets::page_shell("Single Colorcycle", "Cycle all colors.");
 
     let speed = widgets::speed_dropdown();
     page.append(&widgets::labeled_row("Speed", &speed));
@@ -143,10 +206,7 @@ fn single_colorcycle_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
 }
 
 fn multi_static_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Multi Static",
-        "Set four separate zones to four fixed colors.",
-    );
+    let page = widgets::page_shell("Multi Static", "Four fixed zones.");
 
     let colors = zone_colors();
     append_zone_rows(&page, &colors);
@@ -164,10 +224,7 @@ fn multi_static_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
 }
 
 fn multi_breathing_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Multi Breathing",
-        "Fade four keyboard zones using four colors at a shared speed.",
-    );
+    let page = widgets::page_shell("Multi Breathing", "Four zones with breathing.");
 
     let colors = zone_colors();
     let speed = widgets::speed_dropdown();
@@ -189,12 +246,9 @@ fn multi_breathing_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
 }
 
 fn rainbow_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Rainbow",
-        "Run the built-in rainbow mode, optionally overriding its speed.",
-    );
+    let page = widgets::page_shell("Rainbow", "Built-in rainbow mode.");
 
-    let use_speed = widgets::optional_check("Set speed");
+    let use_speed = widgets::optional_check("Speed");
     let speed = widgets::speed_dropdown();
     speed.set_sensitive(false);
     toggle_sensitive(&use_speed, &speed);
@@ -208,31 +262,6 @@ fn rainbow_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
             speed: use_speed
                 .is_active()
                 .then(|| widgets::speed_from_dropdown(&speed)),
-        };
-        on_result(run(command));
-    });
-    page.append(&apply);
-
-    page
-}
-
-fn brightness_page(on_result: Rc<dyn Fn(ExecutionResult)>) -> Box {
-    let page = widgets::page_shell(
-        "Brightness",
-        "Change keyboard brightness without changing the current effect.",
-    );
-
-    let brightness = widgets::brightness_dropdown();
-    let note = Label::new(Some("CLI values are off, low, medium, and high."));
-    note.set_xalign(0.0);
-
-    page.append(&widgets::labeled_row("Brightness", &brightness));
-    page.append(&note);
-
-    let apply = widgets::apply_button();
-    apply.connect_clicked(move |_| {
-        let command = AuraCommand::Brightness {
-            brightness: widgets::brightness_from_dropdown(&brightness),
         };
         on_result(run(command));
     });

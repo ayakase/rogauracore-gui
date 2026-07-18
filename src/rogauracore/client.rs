@@ -11,11 +11,11 @@ pub struct ExecutionResult {
 impl ExecutionResult {
     pub fn summary(&self) -> String {
         if self.success {
-            format!("Applied: {}", self.command)
+            "Applied.".into()
         } else if self.detail.is_empty() {
-            format!("Failed: {}", self.command)
+            "Failed.".into()
         } else {
-            format!("Failed: {} ({})", self.command, self.detail)
+            format!("Failed: {}", self.detail)
         }
     }
 }

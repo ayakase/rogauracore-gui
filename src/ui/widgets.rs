@@ -7,19 +7,20 @@ use gtk4::{
 use crate::rogauracore::command::{Brightness, Speed};
 
 pub fn page_shell(title: &str, description: &str) -> Box {
-    let page = Box::new(Orientation::Vertical, 12);
-    page.set_margin_top(16);
-    page.set_margin_bottom(16);
-    page.set_margin_start(16);
-    page.set_margin_end(16);
+    let page = Box::new(Orientation::Vertical, 18);
+    page.set_margin_top(8);
+    page.set_margin_bottom(8);
+    page.set_margin_start(8);
+    page.set_margin_end(8);
 
     let heading = Label::new(Some(title));
     heading.set_xalign(0.0);
-    heading.add_css_class("title-3");
+    heading.add_css_class("page-title");
 
     let summary = Label::new(Some(description));
     summary.set_xalign(0.0);
     summary.set_wrap(true);
+    summary.add_css_class("page-subtitle");
 
     page.append(&heading);
     page.append(&summary);
@@ -28,11 +29,12 @@ pub fn page_shell(title: &str, description: &str) -> Box {
 
 pub fn labeled_row(label: &str, widget: &impl IsA<gtk4::Widget>) -> Box {
     let row = Box::new(Orientation::Horizontal, 12);
+    row.add_css_class("form-row");
     row.set_halign(Align::Fill);
 
     let text = Label::new(Some(label));
     text.set_xalign(0.0);
-    text.set_width_chars(16);
+    text.set_width_chars(14);
 
     row.append(&text);
     row.append(widget);
@@ -42,6 +44,8 @@ pub fn labeled_row(label: &str, widget: &impl IsA<gtk4::Widget>) -> Box {
 pub fn apply_button() -> Button {
     let button = Button::with_label("Apply");
     button.add_css_class("suggested-action");
+    button.set_halign(Align::Start);
+    button.set_size_request(140, 42);
     button
 }
 
